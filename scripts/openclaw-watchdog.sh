@@ -1,73 +1,113 @@
 #!/bin/bash
-# OpenClaw Watchdog - 自动更新看门狗
-# 功能: 自动检查更新、安全回滚、配置备份
+# OpenClaw Watchdog - 智能守护
+#
+# 功能:
+#   1. 自动更新 OpenClaw（每周日）
+#   2. 保护 model-proxy 配置
+#   3. 检测 proxy 故障并自动切换
+#   4. 配置备份与恢复
 
 # 设置 PATH（launchd 环境需要）
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
+# 配置
 LOG_FILE="$HOME/workspace/logs/openclaw-watchdog.log"
 VERSION_FILE="$HOME/workspace/logs/openclaw-version.txt"
 CONFIG_BACKUP="$HOME/workspace/logs/openclaw-config-backup.tar.gz"
+PROXY_PORT=3456
+PROXY_HEALTH_URL="http://localhost:$PROXY_PORT/_health"
+
+# 原始配置备份（用于回滚）
+PROXY_CONFIG_BACKUP="$HOME/workspace/logs/openclaw-models-original.json"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
+# 检测 model-proxy 是否运行
+check_model_proxy() {
+    if curl -s --max-time 3 "$PROXY_HEALTH_URL" > /dev/null 2>&1; then
+        return 0  # proxy 正常
+    else
+        return 1  # proxy 故障
+    fi
+}
+
+# 保存原始配置
+backup_original_config() {
+    local models_file="$HOME/.openclaw/agents/main/agent/models.json"
+    if [ -f "$models_file" ] && [ ! -f "$PROXY_CONFIG_BACKUP" ]; then
+        cp "$models_file" "$PROXY_CONFIG_BACKUP"
+        log "✅ 已备份原始 models.json"
+    fi
+}
+
+# 如果 proxy 故障，恢复直连配置
+restore_direct_connection() {
+    local models_file="$HOME/.openclaw/agents/main/agent/models.json"
+    
+    if [ -f "$PROXY_CONFIG_BACKUP" ]; then
+        log "⚠️ model-proxy 故障，恢复直连配置..."
+        cp "$PROXY_CONFIG_BACKUP" "$models_file"
+        log "✅ 已恢复原始配置"
+        
+        # 重启 Gateway
+        openclaw gateway restart 2>&1 | tee -a "$LOG_FILE"
+        log "✅ Gateway 已重启"
+    fi
+}
+
+# 检查并保护 model-proxy
+protect_model_proxy() {
+    log "检查 model-proxy 状态..."
+    
+    if ! check_model_proxy; then
+        log "⚠️ model-proxy 无响应"
+        restore_direct_connection
+    else
+        log "✅ model-proxy 正常运行"
+    fi
+}
+
+# 主流程
 log "=== OpenClaw Watchdog Started ==="
 
-# 1. 记录当前版本
+# 1. 备份原始配置
+backup_original_config
+
+# 2. 检查 model-proxy 状态
+protect_model_proxy
+
+# 3. 记录当前版本
 CURRENT_VERSION=$(openclaw --version 2>/dev/null)
 log "当前版本: $CURRENT_VERSION"
-
-# 保存当前版本
 echo "$CURRENT_VERSION" > "$VERSION_FILE"
 
-# 2. 备份配置（包含模型配置）
+# 4. 备份配置
 log "备份配置..."
 tar -czf "$CONFIG_BACKUP" -C ~ .openclaw 2>/dev/null && \
-    log "配置已备份到: $CONFIG_BACKUP" || \
+    log "配置已备份" || \
     log "⚠️ 配置备份失败"
 
-# 3. 备份模型配置文件
-MODEL_CONFIG="$HOME/.openclaw/defaults.json"
-if [ -f "$MODEL_CONFIG" ]; then
-    cp "$MODEL_CONFIG" "$HOME/.openclaw/defaults.json.backup"
-    log "模型配置已备份"
-fi
-
-# 4. 尝试升级
+# 5. 尝试升级
 log "开始升级 OpenClaw..."
 npm update -g openclaw 2>&1 | tee -a "$LOG_FILE"
-
-# 等待一下
 sleep 3
 
-# 5. 测试新版本
+# 6. 测试新版本
 NEW_VERSION=$(openclaw --version 2>/dev/null)
 log "新版本: $NEW_VERSION"
-
-# 检查是否需要更新模型配置
-check_model_config() {
-    log "检查模型配置..."
-    
-    # 检查当前模型配置
-    CURRENT_MODEL=$(cat ~/.openclaw/defaults.json 2>/dev/null | grep -o '"model"[^,}]*' | head -1)
-    log "当前模型: $CURRENT_MODEL"
-}
 
 if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
     log "检测到新版本，测试启动..."
     
-    # 6. 测试 Gateway 状态
+    # 测试 Gateway
     if openclaw gateway status > /dev/null 2>&1; then
         log "✅ 升级成功! Gateway 正常运行"
-        check_model_config
     else
         log "⚠️ Gateway 启动失败，尝试修复..."
-        
-        # 尝试重启 Gateway
         openclaw gateway restart 2>&1 | tee -a "$LOG_FILE"
         sleep 5
         
@@ -76,39 +116,26 @@ if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
         else
             log "❌ Gateway 仍然失败，开始回滚..."
             
-            # 7. 回滚到之前版本
+            # 回滚
             log "回滚到版本: $CURRENT_VERSION"
             npm install -g "openclaw@$CURRENT_VERSION" 2>&1 | tee -a "$LOG_FILE"
-            
             sleep 3
             
-            # 8. 恢复配置
+            # 恢复配置
             log "恢复配置..."
             tar -xzf "$CONFIG_BACKUP" -C ~ 2>/dev/null
             
-            # 恢复模型配置
-            if [ -f "$HOME/.openclaw/defaults.json.backup" ]; then
-                mv "$HOME/.openclaw/defaults.json.backup" "$HOME/.openclaw/defaults.json"
-                log "模型配置已恢复"
-            fi
-            
-            ROLLBACK_VERSION=$(openclaw --version 2>/dev/null)
-            log "已回滚到: $ROLLBACK_VERSION"
-            
             # 重启 Gateway
             openclaw gateway restart 2>&1 | tee -a "$LOG_FILE"
-            
-            if openclaw gateway status > /dev/null 2>&1; then
-                log "✅ 回滚成功，系统正常运行"
-            else
-                log "🚨 回滚后仍有问题，需要手动检查"
-            fi
+            log "✅ 回滚完成"
         fi
     fi
 else
     log "ℹ️ 已是最新版本，无需升级"
-    check_model_config
 fi
+
+# 7. 再次检查 model-proxy
+protect_model_proxy
 
 log "=== Watchdog Finished ==="
 echo "---" >> "$LOG_FILE"
