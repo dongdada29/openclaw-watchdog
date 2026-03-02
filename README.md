@@ -14,14 +14,14 @@
 
 ```bash
 # 一键安装
-curl -fsSL https://raw.githubusercontent.com/dongdada29/watchdog/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dongdada29/openclaw-watchdog/main/install.sh | bash
 ```
 
 ## 手动安装
 
 ```bash
 # 克隆仓库
-git clone https://github.com/dongdada29/watchdog.git
+git clone https://github.com/dongdada29/openclaw-watchdog.git
 cd watchdog
 
 # 复制脚本

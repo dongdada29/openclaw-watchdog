@@ -3,7 +3,7 @@
 
 set -e
 
-REPO_URL="https://github.com/dongdada29/watchdog"
+REPO_URL="https://github.com/dongdada29/openclaw-watchdog"
 INSTALL_DIR="$HOME/workspace"
 SCRIPTS_DIR="$INSTALL_DIR/scripts"
 LAUNCHD_DIR="$HOME/Library/LaunchAgents"
