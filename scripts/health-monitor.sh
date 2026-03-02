@@ -5,10 +5,14 @@
 # 设置 PATH（launchd 环境需要）
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-LOG_FILE="$HOME/workspace/logs/openclaw-health.log"
+# 配置（支持环境变量覆盖）
+WORKSPACE_DIR="${OPENCLAW_WORKSPACE:-$HOME/workspace}"
+LOG_FILE="$WORKSPACE_DIR/logs/openclaw-health.log"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+    # 设置日志文件权限
+    chmod 600 "$LOG_FILE" 2>/dev/null
 }
 
 log "=== OpenClaw Health Monitor Started ==="
@@ -30,7 +34,7 @@ else
     log "⚠️ Gateway 状态异常，尝试重启..."
     openclaw gateway restart 2>&1 | tee -a "$LOG_FILE"
     sleep 5
-    
+
     if openclaw gateway status > /dev/null 2>&1; then
         log "✅ Gateway 已恢复"
     else
@@ -38,11 +42,11 @@ else
     fi
 fi
 
-# 3. 清理旧日志（保留 7 天）
+# 3. 清理旧日志（保留 7 天，仅清理 openclaw 相关日志）
 log ""
 log "清理旧日志..."
-find ~/workspace/logs -name "*.log" -mtime +7 -delete 2>/dev/null
-find ~/Library/Logs -name "*.log" -mtime +7 -delete 2>/dev/null
+find "$WORKSPACE_DIR/logs" -name "openclaw-*.log" -mtime +7 -delete 2>/dev/null
+find ~/Library/Logs -name "openclaw-*.log" -mtime +7 -delete 2>/dev/null
 log "✅ 清理完成"
 
 log ""

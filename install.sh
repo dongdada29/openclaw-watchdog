@@ -4,12 +4,34 @@
 set -e
 
 REPO_URL="https://github.com/dongdada29/openclaw-watchdog"
-INSTALL_DIR="$HOME/workspace"
+# 支持环境变量覆盖安装路径
+INSTALL_DIR="${OPENCLAW_WORKSPACE:-$HOME/workspace}"
 SCRIPTS_DIR="$INSTALL_DIR/scripts"
 LAUNCHD_DIR="$HOME/Library/LaunchAgents"
 LOGS_DIR="$INSTALL_DIR/logs"
 PLIST_NAME="com.dongdada.openclaw-watchdog"
 HEALTH_NAME="com.dongdada.openclaw-health"
+
+# 下载文件的辅助函数（带验证）
+download_file() {
+    local url="$1"
+    local output="$2"
+    local description="$3"
+
+    echo "   下载 $description..."
+    if curl -fsSL --max-time 30 "$url" -o "$output"; then
+        # 验证文件非空
+        if [ -s "$output" ]; then
+            return 0
+        else
+            echo "❌ 下载失败: 文件为空"
+            return 1
+        fi
+    else
+        echo "❌ 下载失败: $url"
+        return 1
+    fi
+}
 
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║        🐕 OpenClaw Watchdog - 安装程序                     ║"
@@ -29,6 +51,11 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
+if ! command -v curl &> /dev/null; then
+    echo "❌ curl 未安装"
+    exit 1
+fi
+
 echo "✅ 依赖检查通过"
 echo ""
 
@@ -43,10 +70,25 @@ echo ""
 # 下载脚本（如果从远程安装）
 if [ "$1" != "--local" ]; then
     echo "⬇️  下载脚本..."
-    curl -fsSL "$REPO_URL/raw/main/scripts/openclaw-watchdog.sh" -o "$SCRIPTS_DIR/openclaw-watchdog.sh"
-    curl -fsSL "$REPO_URL/raw/main/scripts/health-monitor.sh" -o "$SCRIPTS_DIR/health-monitor.sh"
-    curl -fsSL "$REPO_URL/raw/main/launchd/com.dongdada.openclaw-watchdog.plist" -o "$LAUNCHD_DIR/$PLIST_NAME.plist"
-    curl -fsSL "$REPO_URL/raw/main/launchd/com.dongdada.openclaw-health.plist" -o "$LAUNCHD_DIR/$HEALTH_NAME.plist"
+    DOWNLOAD_FAILED=0
+
+    download_file "$REPO_URL/raw/main/scripts/openclaw-watchdog.sh" \
+        "$SCRIPTS_DIR/openclaw-watchdog.sh" "openclaw-watchdog.sh" || DOWNLOAD_FAILED=1
+
+    download_file "$REPO_URL/raw/main/scripts/health-monitor.sh" \
+        "$SCRIPTS_DIR/health-monitor.sh" "health-monitor.sh" || DOWNLOAD_FAILED=1
+
+    download_file "$REPO_URL/raw/main/launchd/com.dongdada.openclaw-watchdog.plist" \
+        "$LAUNCHD_DIR/$PLIST_NAME.plist" "watchdog.plist" || DOWNLOAD_FAILED=1
+
+    download_file "$REPO_URL/raw/main/launchd/com.dongdada.openclaw-health.plist" \
+        "$LAUNCHD_DIR/$HEALTH_NAME.plist" "health.plist" || DOWNLOAD_FAILED=1
+
+    if [ $DOWNLOAD_FAILED -eq 1 ]; then
+        echo ""
+        echo "❌ 部分文件下载失败，请检查网络连接后重试"
+        exit 1
+    fi
 else
     echo "📦 使用本地文件..."
 fi
@@ -78,17 +120,17 @@ echo "║                    ✅ 安装完成！                           ║"
 echo "╠════════════════════════════════════════════════════════════╣"
 echo "║  📦 Watchdog (自动更新)                                    ║"
 echo "║     时间: 每周日 09:00                                     ║"
-echo "║     脚本: ~/workspace/scripts/openclaw-watchdog.sh        ║"
-echo "║     日志: ~/workspace/logs/openclaw-watchdog.log          ║"
+echo "║     脚本: $SCRIPTS_DIR/openclaw-watchdog.sh"
+echo "║     日志: $LOGS_DIR/openclaw-watchdog.log"
 echo "╠════════════════════════════════════════════════════════════╣"
 echo "║  🏥 Health Monitor (健康监控)                              ║"
 echo "║     时间: 每天 09:00                                       ║"
-echo "║     脚本: ~/workspace/scripts/health-monitor.sh           ║"
-echo "║     日志: ~/workspace/logs/openclaw-health.log            ║"
+echo "║     脚本: $SCRIPTS_DIR/health-monitor.sh"
+echo "║     日志: $LOGS_DIR/openclaw-health.log"
 echo "╠════════════════════════════════════════════════════════════╣"
 echo "║  手动运行:                                                 ║"
-echo "║    ~/workspace/scripts/openclaw-watchdog.sh                ║"
-echo "║    ~/workspace/scripts/health-monitor.sh                   ║"
+echo "║    $SCRIPTS_DIR/openclaw-watchdog.sh"
+echo "║    $SCRIPTS_DIR/health-monitor.sh"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 

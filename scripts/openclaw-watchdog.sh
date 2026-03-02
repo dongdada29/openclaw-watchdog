@@ -13,17 +13,19 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-# 配置
-LOG_FILE="$HOME/workspace/logs/openclaw-watchdog.log"
-VERSION_FILE="$HOME/workspace/logs/openclaw-version.txt"
-CONFIG_BACKUP="$HOME/workspace/logs/openclaw-config-backup.tar.gz"
+# 配置（支持环境变量覆盖）
+WORKSPACE_DIR="${OPENCLAW_WORKSPACE:-$HOME/workspace}"
+LOG_FILE="$WORKSPACE_DIR/logs/openclaw-watchdog.log"
+VERSION_FILE="$WORKSPACE_DIR/logs/openclaw-version.txt"
+CONFIG_BACKUP="$WORKSPACE_DIR/logs/openclaw-config-backup.tar.gz"
 PROXY_PORT=3456
 PROXY_HEALTH_URL="http://localhost:$PROXY_PORT/_health"
-PROXY_DIR="$HOME/workspace/openclaw-model-proxy"
+PROXY_DIR="$WORKSPACE_DIR/openclaw-model-proxy"
 MODELS_FILE="$HOME/.openclaw/agents/main/agent/models.json"
-PROXY_CONFIG_BACKUP="$HOME/workspace/logs/openclaw-models-original.json"
-RECOVERY_FLAG="$HOME/workspace/logs/.proxy-recovery-mode"
-NOTIFY_SCRIPT="$HOME/workspace/scripts/openclaw-notify.sh"
+PROXY_CONFIG_BACKUP="$WORKSPACE_DIR/logs/openclaw-models-original.json"
+RECOVERY_FLAG="$WORKSPACE_DIR/logs/.proxy-recovery-mode"
+NOTIFY_SCRIPT="$WORKSPACE_DIR/scripts/openclaw-notify.sh"
+PROXY_PID_FILE="/tmp/openclaw-model-proxy.pid"
 
 # 通知函数
 send_notify() {
@@ -38,6 +40,8 @@ send_notify() {
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+    # 设置日志文件权限，防止敏感信息泄露
+    chmod 600 "$LOG_FILE" 2>/dev/null
 }
 
 # 检测 model-proxy 是否运行
@@ -79,25 +83,45 @@ restore_direct_connection() {
 # 尝试重启 proxy
 restart_proxy() {
     log "🔄 尝试重启 model-proxy..."
-    
+
     # 检查 proxy 目录是否存在
     if [ ! -d "$PROXY_DIR" ]; then
         log "❌ Proxy 目录不存在: $PROXY_DIR"
         return 1
     fi
-    
+
+    # 使用 PID 文件锁定，避免竞态条件
+    if [ -f "$PROXY_PID_FILE" ]; then
+        OLD_PID=$(cat "$PROXY_PID_FILE" 2>/dev/null)
+        if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+            log "⚠️ Proxy 正在启动中 (PID: $OLD_PID)，等待..."
+            sleep 3
+            if check_model_proxy; then
+                log "✅ model-proxy 已由其他进程启动"
+                return 0
+            fi
+        fi
+        # 清理过期的 PID 文件
+        rm -f "$PROXY_PID_FILE"
+    fi
+
     # 先停止旧进程
     pkill -f "node.*openclaw-model-proxy" 2>/dev/null || true
     sleep 2
-    
+
+    # 创建 PID 文件锁
+    echo $$ > "$PROXY_PID_FILE"
+
     # 启动新进程
     cd "$PROXY_DIR"
     nohup node server.js > /dev/null 2>&1 &
+    PROXY_PID=$!
+    echo "$PROXY_PID" > "$PROXY_PID_FILE"
     sleep 3
-    
+
     # 检查是否启动成功
     if check_model_proxy; then
-        log "✅ model-proxy 重启成功"
+        log "✅ model-proxy 重启成功 (PID: $PROXY_PID)"
         # 清除恢复标记
         rm -f "$RECOVERY_FLAG"
         # 发送通知
@@ -105,6 +129,7 @@ restart_proxy() {
         return 0
     else
         log "❌ model-proxy 重启失败"
+        rm -f "$PROXY_PID_FILE"
         send_notify "OpenClaw Proxy 重启失败" "无法重启 model-proxy，请手动检查" "error"
         return 1
     fi
