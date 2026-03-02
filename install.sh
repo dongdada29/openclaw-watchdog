@@ -1,0 +1,91 @@
+#!/bin/bash
+# OpenClaw Updater 一键安装脚本
+
+set -e
+
+REPO_URL="https://github.com/dongdada29/openclaw-updater"
+INSTALL_DIR="$HOME/workspace"
+SCRIPTS_DIR="$INSTALL_DIR/scripts"
+LAUNCHD_DIR="$HOME/Library/LaunchAgents"
+LOGS_DIR="$INSTALL_DIR/logs"
+PLIST_NAME="com.dongdada.openclaw-updater"
+
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║        OpenClaw Auto Updater - 安装程序                    ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+
+# 检查依赖
+echo "🔍 检查依赖..."
+if ! command -v openclaw &> /dev/null; then
+    echo "❌ OpenClaw 未安装"
+    echo "   请先安装: npm install -g openclaw"
+    exit 1
+fi
+
+if ! command -v npm &> /dev/null; then
+    echo "❌ npm 未安装"
+    exit 1
+fi
+
+echo "✅ 依赖检查通过"
+echo ""
+
+# 创建目录
+echo "📁 创建目录..."
+mkdir -p "$SCRIPTS_DIR"
+mkdir -p "$LOGS_DIR"
+mkdir -p "$LAUNCHD_DIR"
+echo "✅ 目录已创建"
+echo ""
+
+# 下载脚本（如果从远程安装）
+if [ "$1" != "--local" ]; then
+    echo "⬇️  下载脚本..."
+    curl -fsSL "$REPO_URL/raw/main/scripts/openclaw-updater.sh" -o "$SCRIPTS_DIR/openclaw-updater.sh"
+    curl -fsSL "$REPO_URL/raw/main/launchd/com.dongdada.openclaw-updater.plist" -o "$LAUNCHD_DIR/$PLIST_NAME.plist"
+else
+    echo "📦 使用本地文件..."
+fi
+
+# 设置权限
+chmod +x "$SCRIPTS_DIR/openclaw-updater.sh"
+echo "✅ 脚本已安装"
+echo ""
+
+# 检查是否已有定时任务
+if launchctl list | grep -q "$PLIST_NAME"; then
+    echo "🔄 更新现有定时任务..."
+    launchctl unload "$LAUNCHD_DIR/$PLIST_NAME.plist" 2>/dev/null || true
+fi
+
+# 加载定时任务
+echo "⏰ 安装定时任务..."
+launchctl load "$LAUNCHD_DIR/$PLIST_NAME.plist"
+echo "✅ 定时任务已安装"
+echo ""
+
+# 显示信息
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║                    安装完成！                              ║"
+echo "╠════════════════════════════════════════════════════════════╣"
+echo "║  定时任务: 每周日 09:00                                    ║"
+echo "║  脚本位置: ~/workspace/scripts/openclaw-updater.sh        ║"
+echo "║  日志文件: ~/workspace/logs/openclaw-updater.log          ║"
+echo "╠════════════════════════════════════════════════════════════╣"
+echo "║  手动运行:                                                 ║"
+echo "║    ~/workspace/scripts/openclaw-updater.sh                 ║"
+echo "║                                                            ║"
+echo "║  查看日志:                                                 ║"
+echo "║    cat ~/workspace/logs/openclaw-updater.log              ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+
+# 询问是否立即运行
+read -p "是否立即检查更新？(y/n) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo ""
+    echo "🚀 运行更新检查..."
+    "$SCRIPTS_DIR/openclaw-updater.sh"
+fi
