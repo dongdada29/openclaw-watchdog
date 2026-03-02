@@ -1,4 +1,4 @@
-# Watchdog
+# OpenClaw Watchdog 🐕
 
 自动检查并更新 OpenClaw 到最新版本，支持自动回滚。
 
@@ -13,7 +13,6 @@
 ## 快速安装
 
 ```bash
-# 一键安装
 curl -fsSL https://raw.githubusercontent.com/dongdada29/openclaw-watchdog/main/install.sh | bash
 ```
 
@@ -22,14 +21,14 @@ curl -fsSL https://raw.githubusercontent.com/dongdada29/openclaw-watchdog/main/i
 ```bash
 # 克隆仓库
 git clone https://github.com/dongdada29/openclaw-watchdog.git
-cd watchdog
+cd openclaw-watchdog
 
 # 复制脚本
-cp scripts/watchdog.sh ~/workspace/scripts/
+cp scripts/openclaw-watchdog.sh ~/workspace/scripts/
 
 # 安装定时任务
-cp launchd/com.dongdada.watchdog.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.dongdada.watchdog.plist
+cp launchd/com.dongdada.openclaw-watchdog.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.dongdada.openclaw-watchdog.plist
 ```
 
 ## 使用方式
@@ -42,39 +41,27 @@ launchctl load ~/Library/LaunchAgents/com.dongdada.watchdog.plist
 
 ```bash
 # 手动运行更新
-~/workspace/scripts/watchdog.sh
+~/workspace/scripts/openclaw-watchdog.sh
 
 # 检查日志
-cat ~/workspace/logs/watchdog.log
+cat ~/workspace/logs/openclaw-watchdog.log
 ```
 
 ### 查看状态
 
 ```bash
 # 查看定时任务状态
-launchctl list | grep watchdog
+launchctl list | grep openclaw-watchdog
 
 # 查看当前版本
 openclaw --version
-```
-
-## 卸载
-
-```bash
-# 停止定时任务
-launchctl unload ~/Library/LaunchAgents/com.dongdada.watchdog.plist
-
-# 删除文件
-rm ~/Library/LaunchAgents/com.dongdada.watchdog.plist
-rm ~/workspace/scripts/watchdog.sh
-rm -rf ~/workspace/logs/watchdog.*
 ```
 
 ## 工作流程
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   Watchdog                      │
+│                   OpenClaw Watchdog                          │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  1. 记录当前版本                                             │
@@ -95,21 +82,21 @@ rm -rf ~/workspace/logs/watchdog.*
 ## 文件说明
 
 ```
-watchdog/
+openclaw-watchdog/
 ├── README.md                    # 本文档
 ├── LICENSE                      # MIT License
 ├── install.sh                   # 一键安装脚本
 ├── scripts/
-│   └── watchdog.sh      # 更新脚本
+│   └── openclaw-watchdog.sh     # 更新脚本
 ├── launchd/
-│   └── com.dongdada.watchdog.plist  # 定时任务配置
+│   └── com.dongdada.openclaw-watchdog.plist  # 定时任务配置
 └── docs/
     └── SKILL.md                 # OpenClaw Skill 文档
 ```
 
 ## 日志文件
 
-- **更新日志**: `~/workspace/logs/watchdog.log`
+- **更新日志**: `~/workspace/logs/openclaw-watchdog.log`
 - **版本记录**: `~/workspace/logs/openclaw-version.txt`
 - **配置备份**: `~/workspace/logs/openclaw-config-backup.tar.gz`
 
@@ -120,17 +107,13 @@ watchdog/
 如果日志中出现这个错误，说明脚本找不到 npm。修复：
 
 ```bash
-# 编辑脚本，确保 PATH 正确
-nano ~/workspace/scripts/watchdog.sh
-
-# 检查前几行是否包含：
-# export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+# 检查脚本开头的 PATH 设置
+head -10 ~/workspace/scripts/openclaw-watchdog.sh
 ```
 
 ### Gateway 未授权
 
 ```bash
-# 重启 Gateway
 openclaw gateway restart
 ```
 
@@ -142,15 +125,16 @@ cd ~
 tar -xzf ~/workspace/logs/openclaw-config-backup.tar.gz
 
 # 安装特定版本
-npm install -g openclaw@2026.2.23
+npm install -g openclaw@2026.2.26
 ```
 
 ## 版本历史
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
-| 1.0.0 | 2026-02-24 | 初始版本 |
+| 1.1.0 | 2026-03-02 | 重命名为 openclaw-watchdog |
 | 1.0.1 | 2026-03-02 | 修复 launchd PATH 问题 |
+| 1.0.0 | 2026-02-24 | 初始版本 |
 
 ## License
 

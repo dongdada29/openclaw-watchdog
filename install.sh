@@ -1,5 +1,5 @@
 #!/bin/bash
-# Watchdog 一键安装脚本
+# OpenClaw Watchdog 一键安装脚本
 
 set -e
 
@@ -8,10 +8,10 @@ INSTALL_DIR="$HOME/workspace"
 SCRIPTS_DIR="$INSTALL_DIR/scripts"
 LAUNCHD_DIR="$HOME/Library/LaunchAgents"
 LOGS_DIR="$INSTALL_DIR/logs"
-PLIST_NAME="com.dongdada.watchdog"
+PLIST_NAME="com.dongdada.openclaw-watchdog"
 
 echo "╔════════════════════════════════════════════════════════════╗"
-echo "║        Watchdog - 安装程序                    ║"
+echo "║        🐕 OpenClaw Watchdog - 安装程序                     ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -42,14 +42,14 @@ echo ""
 # 下载脚本（如果从远程安装）
 if [ "$1" != "--local" ]; then
     echo "⬇️  下载脚本..."
-    curl -fsSL "$REPO_URL/raw/main/scripts/watchdog.sh" -o "$SCRIPTS_DIR/watchdog.sh"
-    curl -fsSL "$REPO_URL/raw/main/launchd/com.dongdada.watchdog.plist" -o "$LAUNCHD_DIR/$PLIST_NAME.plist"
+    curl -fsSL "$REPO_URL/raw/main/scripts/openclaw-watchdog.sh" -o "$SCRIPTS_DIR/openclaw-watchdog.sh"
+    curl -fsSL "$REPO_URL/raw/main/launchd/com.dongdada.openclaw-watchdog.plist" -o "$LAUNCHD_DIR/$PLIST_NAME.plist"
 else
     echo "📦 使用本地文件..."
 fi
 
 # 设置权限
-chmod +x "$SCRIPTS_DIR/watchdog.sh"
+chmod +x "$SCRIPTS_DIR/openclaw-watchdog.sh"
 echo "✅ 脚本已安装"
 echo ""
 
@@ -67,17 +67,17 @@ echo ""
 
 # 显示信息
 echo "╔════════════════════════════════════════════════════════════╗"
-echo "║                    安装完成！                              ║"
+echo "║                    ✅ 安装完成！                           ║"
 echo "╠════════════════════════════════════════════════════════════╣"
 echo "║  定时任务: 每周日 09:00                                    ║"
-echo "║  脚本位置: ~/workspace/scripts/watchdog.sh        ║"
-echo "║  日志文件: ~/workspace/logs/watchdog.log          ║"
+echo "║  脚本位置: ~/workspace/scripts/openclaw-watchdog.sh       ║"
+echo "║  日志文件: ~/workspace/logs/openclaw-watchdog.log         ║"
 echo "╠════════════════════════════════════════════════════════════╣"
 echo "║  手动运行:                                                 ║"
-echo "║    ~/workspace/scripts/watchdog.sh                 ║"
+echo "║    ~/workspace/scripts/openclaw-watchdog.sh                ║"
 echo "║                                                            ║"
 echo "║  查看日志:                                                 ║"
-echo "║    cat ~/workspace/logs/watchdog.log              ║"
+echo "║    cat ~/workspace/logs/openclaw-watchdog.log              ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -87,5 +87,5 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo ""
     echo "🚀 运行更新检查..."
-    "$SCRIPTS_DIR/watchdog.sh"
+    "$SCRIPTS_DIR/openclaw-watchdog.sh"
 fi

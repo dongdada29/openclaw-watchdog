@@ -1,21 +1,21 @@
 #!/bin/bash
-# OpenClaw Safe Updater with Auto-Rollback & Model Safety
-# 尝试升级，测试，失败自动回滚，包含模型配置保护
+# OpenClaw Watchdog - 自动更新看门狗
+# 功能: 自动检查更新、安全回滚、配置备份
 
 # 设置 PATH（launchd 环境需要）
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-LOG_FILE="/Users/louis/workspace/logs/watchdog.log"
-VERSION_FILE="/Users/louis/workspace/logs/openclaw-version.txt"
-CONFIG_BACKUP="/Users/louis/workspace/logs/openclaw-config-backup.tar.gz"
+LOG_FILE="$HOME/workspace/logs/openclaw-watchdog.log"
+VERSION_FILE="$HOME/workspace/logs/openclaw-version.txt"
+CONFIG_BACKUP="$HOME/workspace/logs/openclaw-config-backup.tar.gz"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
-log "=== OpenClaw Safe Updater Started ==="
+log "=== OpenClaw Watchdog Started ==="
 
 # 1. 记录当前版本
 CURRENT_VERSION=$(openclaw --version 2>/dev/null)
@@ -26,8 +26,9 @@ echo "$CURRENT_VERSION" > "$VERSION_FILE"
 
 # 2. 备份配置（包含模型配置）
 log "备份配置..."
-tar -czf "$CONFIG_BACKUP" ~/.openclaw 2>/dev/null
-log "配置已备份到: $CONFIG_BACKUP"
+tar -czf "$CONFIG_BACKUP" -C ~ .openclaw 2>/dev/null && \
+    log "配置已备份到: $CONFIG_BACKUP" || \
+    log "⚠️ 配置备份失败"
 
 # 3. 备份模型配置文件
 MODEL_CONFIG="$HOME/.openclaw/defaults.json"
@@ -54,10 +55,6 @@ check_model_config() {
     # 检查当前模型配置
     CURRENT_MODEL=$(cat ~/.openclaw/defaults.json 2>/dev/null | grep -o '"model"[^,}]*' | head -1)
     log "当前模型: $CURRENT_MODEL"
-    
-    # 检查是否支持图片
-    # 如果当前模型不支持图片，需要切换
-    # 这里可以添加模型能力检测逻辑
 }
 
 if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
@@ -66,10 +63,7 @@ if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
     # 6. 测试 Gateway 状态
     if openclaw gateway status > /dev/null 2>&1; then
         log "✅ 升级成功! Gateway 正常运行"
-        
-        # 7. 检查模型配置是否正常
         check_model_config
-        
     else
         log "⚠️ Gateway 启动失败，尝试修复..."
         
@@ -82,14 +76,13 @@ if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
         else
             log "❌ Gateway 仍然失败，开始回滚..."
             
-            # 8. 回滚到之前版本
-            OLD_VERSION="$CURRENT_VERSION"
-            log "回滚到版本: $OLD_VERSION"
-            npm install -g "openclaw@$OLD_VERSION" 2>&1 | tee -a "$LOG_FILE"
+            # 7. 回滚到之前版本
+            log "回滚到版本: $CURRENT_VERSION"
+            npm install -g "openclaw@$CURRENT_VERSION" 2>&1 | tee -a "$LOG_FILE"
             
             sleep 3
             
-            # 9. 恢复配置
+            # 8. 恢复配置
             log "恢复配置..."
             tar -xzf "$CONFIG_BACKUP" -C ~ 2>/dev/null
             
@@ -114,10 +107,8 @@ if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
     fi
 else
     log "ℹ️ 已是最新版本，无需升级"
-    
-    # 仍然检查模型配置是否正常
     check_model_config
 fi
 
-log "=== Updater Finished ==="
+log "=== Watchdog Finished ==="
 echo "---" >> "$LOG_FILE"
