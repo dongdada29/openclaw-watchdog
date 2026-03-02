@@ -1,4 +1,4 @@
-# OpenClaw Auto Updater
+# Watchdog
 
 自动检查并更新 OpenClaw 到最新版本，支持自动回滚。
 
@@ -14,22 +14,22 @@
 
 ```bash
 # 一键安装
-curl -fsSL https://raw.githubusercontent.com/dongdada29/openclaw-updater/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dongdada29/watchdog/main/install.sh | bash
 ```
 
 ## 手动安装
 
 ```bash
 # 克隆仓库
-git clone https://github.com/dongdada29/openclaw-updater.git
-cd openclaw-updater
+git clone https://github.com/dongdada29/watchdog.git
+cd watchdog
 
 # 复制脚本
-cp scripts/openclaw-updater.sh ~/workspace/scripts/
+cp scripts/watchdog.sh ~/workspace/scripts/
 
 # 安装定时任务
-cp launchd/com.dongdada.openclaw-updater.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.dongdada.openclaw-updater.plist
+cp launchd/com.dongdada.watchdog.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.dongdada.watchdog.plist
 ```
 
 ## 使用方式
@@ -42,17 +42,17 @@ launchctl load ~/Library/LaunchAgents/com.dongdada.openclaw-updater.plist
 
 ```bash
 # 手动运行更新
-~/workspace/scripts/openclaw-updater.sh
+~/workspace/scripts/watchdog.sh
 
 # 检查日志
-cat ~/workspace/logs/openclaw-updater.log
+cat ~/workspace/logs/watchdog.log
 ```
 
 ### 查看状态
 
 ```bash
 # 查看定时任务状态
-launchctl list | grep openclaw-updater
+launchctl list | grep watchdog
 
 # 查看当前版本
 openclaw --version
@@ -62,19 +62,19 @@ openclaw --version
 
 ```bash
 # 停止定时任务
-launchctl unload ~/Library/LaunchAgents/com.dongdada.openclaw-updater.plist
+launchctl unload ~/Library/LaunchAgents/com.dongdada.watchdog.plist
 
 # 删除文件
-rm ~/Library/LaunchAgents/com.dongdada.openclaw-updater.plist
-rm ~/workspace/scripts/openclaw-updater.sh
-rm -rf ~/workspace/logs/openclaw-updater.*
+rm ~/Library/LaunchAgents/com.dongdada.watchdog.plist
+rm ~/workspace/scripts/watchdog.sh
+rm -rf ~/workspace/logs/watchdog.*
 ```
 
 ## 工作流程
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   OpenClaw Auto Updater                      │
+│                   Watchdog                      │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  1. 记录当前版本                                             │
@@ -95,21 +95,21 @@ rm -rf ~/workspace/logs/openclaw-updater.*
 ## 文件说明
 
 ```
-openclaw-updater/
+watchdog/
 ├── README.md                    # 本文档
 ├── LICENSE                      # MIT License
 ├── install.sh                   # 一键安装脚本
 ├── scripts/
-│   └── openclaw-updater.sh      # 更新脚本
+│   └── watchdog.sh      # 更新脚本
 ├── launchd/
-│   └── com.dongdada.openclaw-updater.plist  # 定时任务配置
+│   └── com.dongdada.watchdog.plist  # 定时任务配置
 └── docs/
     └── SKILL.md                 # OpenClaw Skill 文档
 ```
 
 ## 日志文件
 
-- **更新日志**: `~/workspace/logs/openclaw-updater.log`
+- **更新日志**: `~/workspace/logs/watchdog.log`
 - **版本记录**: `~/workspace/logs/openclaw-version.txt`
 - **配置备份**: `~/workspace/logs/openclaw-config-backup.tar.gz`
 
@@ -121,7 +121,7 @@ openclaw-updater/
 
 ```bash
 # 编辑脚本，确保 PATH 正确
-nano ~/workspace/scripts/openclaw-updater.sh
+nano ~/workspace/scripts/watchdog.sh
 
 # 检查前几行是否包含：
 # export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"

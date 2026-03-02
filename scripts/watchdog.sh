@@ -7,7 +7,7 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-LOG_FILE="/Users/louis/workspace/logs/openclaw-updater.log"
+LOG_FILE="/Users/louis/workspace/logs/watchdog.log"
 VERSION_FILE="/Users/louis/workspace/logs/openclaw-version.txt"
 CONFIG_BACKUP="/Users/louis/workspace/logs/openclaw-config-backup.tar.gz"
 

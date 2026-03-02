@@ -1,11 +1,11 @@
 ---
-name: openclaw-updater
+name: watchdog
 description: |
   检查并升级 OpenClaw 到最新版本。每周日凌晨自动检查更新。
   用于: (1) 检查当前版本, (2) 升级到最新版本, (3) 查看更新日志
 ---
 
-# OpenClaw Updater Skill
+# Watchdog Skill
 
 ## 检查当前版本
 
@@ -44,22 +44,22 @@ openclaw status
 
 ### ✅ 已设置每周日凌晨自动检查更新
 
-- **任务**: com.dongdada.openclaw-updater
+- **任务**: com.dongdada.watchdog
 - **运行时间**: 每周日 09:00
-- **日志**: ~/workspace/logs/openclaw-updater.log
+- **日志**: ~/workspace/logs/watchdog.log
 
 ```bash
 # 状态
 launchctl list | grep openclaw
 
 # 查看日志
-cat ~/workspace/logs/openclaw-updater.log
+cat ~/workspace/logs/watchdog.log
 
 # 手动运行
-~/workspace/scripts/openclaw-updater.sh
+~/workspace/scripts/watchdog.sh
 
 # 停止定时任务
-launchctl unload ~/Library/LaunchAgents/com.dongdada.openclaw-updater.plist
+launchctl unload ~/Library/LaunchAgents/com.dongdada.watchdog.plist
 ```
 
 ## 常见问题
