@@ -4,7 +4,7 @@
 # 功能:
 #   1. 自动更新 OpenClaw（每周日）
 #   2. 保护 model-proxy 配置
-#   3. 检测 proxy 故障并自动切换
+#   3. 检测 proxy 故障并自动抢救
 #   4. 配置备份与恢复
 
 # 设置 PATH（launchd 环境需要）
@@ -18,9 +18,10 @@ VERSION_FILE="$HOME/workspace/logs/openclaw-version.txt"
 CONFIG_BACKUP="$HOME/workspace/logs/openclaw-config-backup.tar.gz"
 PROXY_PORT=3456
 PROXY_HEALTH_URL="http://localhost:$PROXY_PORT/_health"
-
-# 原始配置备份（用于回滚）
+PROXY_DIR="$HOME/workspace/openclaw-model-proxy"
+MODELS_FILE="$HOME/.openclaw/agents/main/agent/models.json"
 PROXY_CONFIG_BACKUP="$HOME/workspace/logs/openclaw-models-original.json"
+RECOVERY_FLAG="$HOME/workspace/logs/.proxy-recovery-mode"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
@@ -28,7 +29,7 @@ log() {
 
 # 检测 model-proxy 是否运行
 check_model_proxy() {
-    if curl -s --max-time 3 "$PROXY_HEALTH_URL" > /dev/null 2>&1; then
+    if curl -s --max-time 5 "$PROXY_HEALTH_URL" > /dev/null 2>&1; then
         return 0  # proxy 正常
     else
         return 1  # proxy 故障
@@ -37,25 +38,56 @@ check_model_proxy() {
 
 # 保存原始配置
 backup_original_config() {
-    local models_file="$HOME/.openclaw/agents/main/agent/models.json"
-    if [ -f "$models_file" ] && [ ! -f "$PROXY_CONFIG_BACKUP" ]; then
-        cp "$models_file" "$PROXY_CONFIG_BACKUP"
+    if [ -f "$MODELS_FILE" ] && [ ! -f "$PROXY_CONFIG_BACKUP" ]; then
+        cp "$MODELS_FILE" "$PROXY_CONFIG_BACKUP"
         log "✅ 已备份原始 models.json"
     fi
 }
 
-# 如果 proxy 故障，恢复直连配置
+# 恢复直连配置
 restore_direct_connection() {
-    local models_file="$HOME/.openclaw/agents/main/agent/models.json"
-    
     if [ -f "$PROXY_CONFIG_BACKUP" ]; then
-        log "⚠️ model-proxy 故障，恢复直连配置..."
-        cp "$PROXY_CONFIG_BACKUP" "$models_file"
+        log "⚠️ 恢复直连配置..."
+        cp "$PROXY_CONFIG_BACKUP" "$MODELS_FILE"
         log "✅ 已恢复原始配置"
         
         # 重启 Gateway
         openclaw gateway restart 2>&1 | tee -a "$LOG_FILE"
         log "✅ Gateway 已重启"
+        
+        # 标记为恢复模式
+        echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$RECOVERY_FLAG"
+    fi
+}
+
+# 尝试重启 proxy
+restart_proxy() {
+    log "🔄 尝试重启 model-proxy..."
+    
+    # 检查 proxy 目录是否存在
+    if [ ! -d "$PROXY_DIR" ]; then
+        log "❌ Proxy 目录不存在: $PROXY_DIR"
+        return 1
+    fi
+    
+    # 先停止旧进程
+    pkill -f "node.*openclaw-model-proxy" 2>/dev/null || true
+    sleep 2
+    
+    # 启动新进程
+    cd "$PROXY_DIR"
+    nohup node server.js > /dev/null 2>&1 &
+    sleep 3
+    
+    # 检查是否启动成功
+    if check_model_proxy; then
+        log "✅ model-proxy 重启成功"
+        # 清除恢复标记
+        rm -f "$RECOVERY_FLAG"
+        return 0
+    else
+        log "❌ model-proxy 重启失败"
+        return 1
     fi
 }
 
@@ -63,16 +95,29 @@ restore_direct_connection() {
 protect_model_proxy() {
     log "检查 model-proxy 状态..."
     
-    if ! check_model_proxy; then
-        log "⚠️ model-proxy 无响应"
-        restore_direct_connection
-    else
+    if check_model_proxy; then
         log "✅ model-proxy 正常运行"
+        
+        # 如果之前在恢复模式，现在 proxy 恢复了，询问是否切回
+        if [ -f "$RECOVERY_FLAG" ]; then
+            log "ℹ️ 检测到 proxy 已恢复，可手动切换回 proxy 模式:"
+            log "   ~/workspace/scripts/model-proxy-switch.sh enable"
+        fi
+    else
+        log "⚠️ model-proxy 无响应"
+        
+        # 先恢复直连，保证 OpenClaw 可用
+        restore_direct_connection
+        
+        # 尝试重启 proxy
+        restart_proxy
     fi
 }
 
 # 主流程
-log "=== OpenClaw Watchdog Started ==="
+log "╔════════════════════════════════════════════════════════════╗"
+log "║              OpenClaw Watchdog Started                     ║"
+log "╚════════════════════════════════════════════════════════════╝"
 
 # 1. 备份原始配置
 backup_original_config
@@ -88,7 +133,7 @@ echo "$CURRENT_VERSION" > "$VERSION_FILE"
 # 4. 备份配置
 log "备份配置..."
 tar -czf "$CONFIG_BACKUP" -C ~ .openclaw 2>/dev/null && \
-    log "配置已备份" || \
+    log "✅ 配置已备份" || \
     log "⚠️ 配置备份失败"
 
 # 5. 尝试升级
@@ -137,5 +182,7 @@ fi
 # 7. 再次检查 model-proxy
 protect_model_proxy
 
-log "=== Watchdog Finished ==="
+log "╔════════════════════════════════════════════════════════════╗"
+log "║              Watchdog Finished                             ║"
+log "╚════════════════════════════════════════════════════════════╝"
 echo "---" >> "$LOG_FILE"
