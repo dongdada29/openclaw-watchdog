@@ -60,25 +60,25 @@ backup_config() {
 
 enable_proxy() {
     log "🔄 切换到 proxy 模式..."
-    
+
     # 检查 proxy 是否运行
     if ! check_proxy; then
         echo "⚠️ model-proxy 未运行，尝试启动..."
         start_proxy
         sleep 3
-        
+
         if ! check_proxy; then
             echo "❌ 无法启动 proxy，请检查日志"
             exit 1
         fi
     fi
-    
+
     # 备份原始配置
     if [ ! -f "$BACKUP_FILE" ]; then
         backup_config
     fi
-    
-    # 读取原始配置，修改 baseUrl
+
+    # 读取原始配置，修改 baseUrl（使用正确的路由前缀）
     if [ -f "$MODELS_FILE" ]; then
         # 使用 Python 进行 JSON 处理（更可靠）
         if command -v python3 &> /dev/null; then
@@ -86,32 +86,43 @@ enable_proxy() {
 import json
 import sys
 
-with open('$MODELS_FILE', 'r') as f:
+PROXY_URL = "http://localhost:3456"
+
+# Provider 到 proxy 路由前缀的映射
+PROVIDER_ROUTES = {
+    "zai": "/zai-coding",
+    "minimax": "/minimax",
+    "claude-proxy": "/claude-proxy",
+}
+
+MODELS_FILE = "$MODELS_FILE"
+
+with open(MODELS_FILE, 'r') as f:
     config = json.load(f)
 
-# 修改所有 provider 的 baseUrl
+# 修改各 provider 的 baseUrl（使用对应路由前缀）
 for provider_name, provider_config in config.get('providers', {}).items():
     if 'baseUrl' in provider_config:
-        provider_config['baseUrl'] = '$PROXY_URL'
+        route = PROVIDER_ROUTES.get(provider_name, "")
+        provider_config['baseUrl'] = f"{PROXY_URL}{route}"
+        print(f"  {provider_name}: {PROXY_URL}{route}")
 
-with open('$MODELS_FILE', 'w') as f:
+with open(MODELS_FILE, 'w') as f:
     json.dump(config, f, indent=2)
 
 print('✅ 已修改所有 provider 的 baseUrl')
 EOF
         else
-            # 使用 sed 作为备选
-            sed -i.bak "s|\"baseUrl\": \"https://[^\"]*\"|\"baseUrl\": \"$PROXY_URL\"|g" "$MODELS_FILE"
-            rm -f "$MODELS_FILE.bak"
-            echo "✅ 已修改 baseUrl（使用 sed）"
+            echo "❌ 需要 Python3 来处理 JSON 配置"
+            exit 1
         fi
-        
+
         echo "✅ 已切换到 proxy 模式"
         echo "   Proxy URL: $PROXY_URL"
-        
+
         # 清除恢复标记
         rm -f "$RECOVERY_FLAG"
-        
+
         # 重启 Gateway
         echo "🔄 重启 Gateway..."
         openclaw gateway restart
