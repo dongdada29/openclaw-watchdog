@@ -296,7 +296,17 @@ recover() {
 }
 
 watch() {
-    echo "持续监控 model-proxy（每 60 秒检查一次，Ctrl+C 停止）..."
+    # 退避重试配置
+    local MAX_RETRIES=5
+    local BASE_INTERVAL=60
+    local MAX_INTERVAL=600
+    local retry_count=0
+    local current_interval=$BASE_INTERVAL
+    
+    echo "持续监控 model-proxy（退避重试模式，Ctrl+C 停止）..."
+    echo "  初始间隔: ${BASE_INTERVAL}s"
+    echo "  最大间隔: ${MAX_INTERVAL}s"
+    echo "  最大重试: ${MAX_RETRIES} 次"
     echo ""
     
     while true; do
@@ -304,12 +314,43 @@ watch() {
         
         if check_proxy; then
             echo "[$TIMESTAMP] ✅ Proxy 正常"
+            
+            # 重置退避
+            if [ $retry_count -gt 0 ]; then
+                echo "[$TIMESTAMP] 🔄 重置退避计数器"
+                retry_count=0
+                current_interval=$BASE_INTERVAL
+            fi
         else
-            echo "[$TIMESTAMP] ❌ Proxy 故障，触发恢复..."
-            recover
+            retry_count=$((retry_count + 1))
+            echo "[$TIMESTAMP] ❌ Proxy 故障 (重试 $retry_count/$MAX_RETRIES)"
+            
+            if [ $retry_count -le $MAX_RETRIES ]; then
+                # 尝试恢复
+                recover
+                
+                # 计算退避间隔（指数退避）
+                current_interval=$((BASE_INTERVAL * (2 ** (retry_count - 1))))
+                [ $current_interval -gt $MAX_INTERVAL ] && current_interval=$MAX_INTERVAL
+                
+                echo "[$TIMESTAMP] ⏳ 等待 ${current_interval}s 后重试..."
+            else
+                echo "[$TIMESTAMP] 🚨 达到最大重试次数，停止重试"
+                echo "[$TIMESTAMP] 请手动检查 proxy 状态"
+                
+                # 发送通知
+                if [ -x "$HOME/workspace/scripts/openclaw-notify.sh" ]; then
+                    "$HOME/workspace/scripts/openclaw-notify.sh" send \
+                        "OpenClaw Proxy 故障" \
+                        "达到最大重试次数 ($MAX_RETRIES)，请手动检查" \
+                        "error"
+                fi
+                
+                break
+            fi
         fi
         
-        sleep 60
+        sleep $current_interval
     done
 }
 
