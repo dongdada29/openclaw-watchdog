@@ -1,6 +1,6 @@
 # OpenClaw Watchdog 🐕
 
-OpenClaw 的守护工具，包含自动更新和健康监控。
+OpenClaw 的守护工具，包含自动更新、健康监控和 model-proxy 保护。
 
 ## 组件
 
@@ -8,6 +8,7 @@ OpenClaw 的守护工具，包含自动更新和健康监控。
 |------|------|------|
 | **Watchdog** | 自动更新 + 回滚 | 每周日 09:00 |
 | **Health Monitor** | 健康检查 + 清理 | 每天 09:00 |
+| **Proxy Protection** | model-proxy 故障保护 | 实时 |
 
 ## 特性
 
@@ -15,15 +16,17 @@ OpenClaw 的守护工具，包含自动更新和健康监控。
 - ✅ 每周日凌晨 09:00 自动检查更新
 - ✅ 更新失败自动回滚到之前版本
 - ✅ 配置自动备份
-- ✅ 模型配置保护
+- ✅ **model-proxy 故障自动切换直连**
 
 ### Health Monitor (健康监控)
+- ✅ 使用 `openclaw doctor` 进行完整检查
 - ✅ Gateway 状态检测 + 自动修复
-- ✅ 磁盘空间监控
-- ✅ 内存使用检查
-- ✅ 配置完整性验证
-- ✅ Session 文件清理
 - ✅ 日志文件清理
+
+### Model-Proxy 保护
+- ✅ 自动检测 proxy 是否存活
+- ✅ proxy 故障时自动恢复直连配置
+- ✅ 提供手动切换工具
 
 ## 快速安装
 
@@ -60,6 +63,32 @@ launchctl load ~/Library/LaunchAgents/com.dongdada.openclaw-watchdog.plist
 
 # 检查日志
 cat ~/workspace/logs/openclaw-watchdog.log
+```
+
+### 健康检查
+
+```bash
+# 手动运行健康检查
+~/workspace/scripts/health-monitor.sh
+
+# 查看日志
+cat ~/workspace/logs/openclaw-health.log
+```
+
+### Model-Proxy 切换
+
+```bash
+# 查看状态
+~/workspace/scripts/model-proxy-switch.sh status
+
+# 启用 proxy 模式
+~/workspace/scripts/model-proxy-switch.sh enable
+
+# 禁用 proxy 模式（恢复直连）
+~/workspace/scripts/model-proxy-switch.sh disable
+
+# 测试 proxy
+~/workspace/scripts/model-proxy-switch.sh test
 ```
 
 ### 查看状态
@@ -102,9 +131,12 @@ openclaw-watchdog/
 ├── LICENSE                      # MIT License
 ├── install.sh                   # 一键安装脚本
 ├── scripts/
-│   └── openclaw-watchdog.sh     # 更新脚本
+│   ├── openclaw-watchdog.sh     # 自动更新脚本
+│   ├── health-monitor.sh        # 健康监控脚本
+│   └── model-proxy-switch.sh    # Model-Proxy 切换工具
 ├── launchd/
-│   └── com.dongdada.openclaw-watchdog.plist  # 定时任务配置
+│   ├── com.dongdada.openclaw-watchdog.plist  # 更新定时任务
+│   └── com.dongdada.openclaw-health.plist    # 健康检查定时任务
 └── docs/
     └── SKILL.md                 # OpenClaw Skill 文档
 ```
@@ -112,8 +144,10 @@ openclaw-watchdog/
 ## 日志文件
 
 - **更新日志**: `~/workspace/logs/openclaw-watchdog.log`
+- **健康日志**: `~/workspace/logs/openclaw-health.log`
 - **版本记录**: `~/workspace/logs/openclaw-version.txt`
 - **配置备份**: `~/workspace/logs/openclaw-config-backup.tar.gz`
+- **原始配置**: `~/workspace/logs/openclaw-models-original.json`
 
 ## 故障排除
 
@@ -147,6 +181,7 @@ npm install -g openclaw@2026.2.26
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 1.2.0 | 2026-03-02 | 添加 model-proxy 保护机制 |
 | 1.1.0 | 2026-03-02 | 重命名为 openclaw-watchdog |
 | 1.0.1 | 2026-03-02 | 修复 launchd PATH 问题 |
 | 1.0.0 | 2026-02-24 | 初始版本 |
