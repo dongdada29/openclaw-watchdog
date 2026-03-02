@@ -6,6 +6,7 @@
 #   2. 保护 model-proxy 配置
 #   3. 检测 proxy 故障并自动抢救
 #   4. 配置备份与恢复
+#   5. 统一通知系统
 
 # 设置 PATH（launchd 环境需要）
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -22,6 +23,18 @@ PROXY_DIR="$HOME/workspace/openclaw-model-proxy"
 MODELS_FILE="$HOME/.openclaw/agents/main/agent/models.json"
 PROXY_CONFIG_BACKUP="$HOME/workspace/logs/openclaw-models-original.json"
 RECOVERY_FLAG="$HOME/workspace/logs/.proxy-recovery-mode"
+NOTIFY_SCRIPT="$HOME/workspace/scripts/openclaw-notify.sh"
+
+# 通知函数
+send_notify() {
+    local title="$1"
+    local message="$2"
+    local level="${3:-info}"
+    
+    if [ -x "$NOTIFY_SCRIPT" ]; then
+        "$NOTIFY_SCRIPT" send "$title" "$message" "$level" "macos,discord"
+    fi
+}
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
@@ -57,6 +70,9 @@ restore_direct_connection() {
         
         # 标记为恢复模式
         echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$RECOVERY_FLAG"
+        
+        # 发送通知
+        send_notify "OpenClaw Proxy 故障" "model-proxy 无响应，已切换到直连模式" "warning"
     fi
 }
 
@@ -84,9 +100,12 @@ restart_proxy() {
         log "✅ model-proxy 重启成功"
         # 清除恢复标记
         rm -f "$RECOVERY_FLAG"
+        # 发送通知
+        send_notify "OpenClaw Proxy 恢复" "model-proxy 已成功重启" "info"
         return 0
     else
         log "❌ model-proxy 重启失败"
+        send_notify "OpenClaw Proxy 重启失败" "无法重启 model-proxy，请手动检查" "error"
         return 1
     fi
 }
@@ -102,6 +121,7 @@ protect_model_proxy() {
         if [ -f "$RECOVERY_FLAG" ]; then
             log "ℹ️ 检测到 proxy 已恢复，可手动切换回 proxy 模式:"
             log "   ~/workspace/scripts/model-proxy-switch.sh enable"
+            send_notify "OpenClaw Proxy 可用" "model-proxy 已恢复，可切换回 proxy 模式" "info"
         fi
     else
         log "⚠️ model-proxy 无响应"
